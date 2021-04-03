@@ -1,0 +1,277 @@
+---
+title: "ECON 825 HW 2"
+author: "JIAXI WANG"
+date: "3/28/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=F, include=F, collapse=T}
+rm(list=ls()) #rm(list of objects) removes all objects from memory
+library(tsibble)
+library(tidyverse)
+library(tsibbledata)
+library(fable)
+library(fpp3)
+library(forecast)
+library(ggplot2)
+library(ggfortify)
+library(ggplot2)
+library(readxl)
+```
+
+Hyndman Chapter 2 end of chapter Must do problems: 1-3, 5, 6, 7, 8, 9 
+
+Optional: 4, 7, 10
+
+ 1
+```{r echo=TRUE, collapse=T}
+help(gafa_stock)
+autoplot(gafa_stock)
+gafa_stock %>%
+  group_by(Symbol) %>%
+  filter(Close==max(Close))
+```
+  The GAFA stock prices is taken from 2014 to 2018 for GOOGLE, APPLE, FACEBOOK and AMAZON. It is a tsibble consisting data from irregular trading days with open, close, high and volumne data stored.
+```{r echo=TRUE, collapse=T}
+help(PBS)
+autoplot(PBS)
+frequency(PBS)  
+```
+  PBS stands for monthly medicare Australia prescription data. The time inverval is monthly. 
+
+```{r echo=TRUE, collapse=T}
+help(vic_elec)
+autoplot(vic_elec)
+frequency(vic_elec)  
+```
+  This is the half-hourly operational electricity demand for Victoria, Austrilia, the frequency for vic_elec is half-hourly, or 48 times per day from 2012 to 2015. There is a seasonaly observed in this auoplot that demand for electricity always increases in the middle of the year for Austrilia, assuming high heating demand. Several spikes in the beginning of each year may due to the holidays. 
+
+```{r echo=TRUE, collapse=T}
+help(pelt)
+autoplot(pelt)
+frequency(pelt)  
+```
+  Pelt is the Hudson Bay Company's trading record for Snowshoe Hare and Cnadian Lynx furs from 1845 to 1935. The frequency is annualy. 
+
+# 2
+```{r echo=TRUE, collapse=T}
+tute1 <- readr::read_csv("tute1(1).csv")
+View(tute1)
+
+mytimeseries <- tute1 %>%
+  mutate(Quarter = yearmonth(Quarter)) %>%
+  as_tsibble(index = Quarter)
+
+mytimeseries %>%
+  pivot_longer(-Quarter, names_to="Key", values_to="Value") %>%
+  ggplot(aes(x = Quarter, y = Value, colour = Key)) +
+    geom_line() +
+    facet_grid(vars(Key), scales = "free_y")
+
+```
+  When facets_=TRUE_grid is not included, the graph gives an error. When facets_=TRUE_grid is included, the graph shows a colorful representation of the time series.
+
+# 3
+```{r echo=TRUE, collapse=T}
+mytourism <- read_excel("tourism.xlsx") 
+show(mytourism)
+#view(tourism)
+mytourism %>%
+   mutate(Quarter=yearmonth(Quarter)) %>%
+   as_tsibble(index=Quarter,key=c(Region,State, Purpose))
+mytourism %>%
+  group_by(Region, Purpose) %>%
+  summarize(Overnight=max(mean(Trips)))
+
+mytourism %>%
+   mutate(Quarter=yearmonth(Quarter)) %>%
+   as_tsibble(index=Quarter,key=c(Region,State, Purpose))
+mytourism %>%
+  group_by(State) %>%
+  summarise(Total_Trips = sum(Trips))
+  
+```
+
+# 5
+```{r echo=TRUE, collapse=T}
+aus_arrivals
+
+autoplot(aus_arrivals)
+gg_season(aus_arrivals)
+gg_subseries(aus_arrivals)
+```
+  Compare the 4 countries: Based on the autoplot of the arrivals, we see an increasing trend of overnight trips from People from New Zealand. Japanese visitors had an increasing visiting volumne in between 1990 to 1996(approximately), then the volumne started to drop, while on the other side US visitors have relatively flat visiting volumne. Looking at the subset graph, UK visitors exhibit a very obevious seasonality. They started with high visiting volumne in January, then the visits go down toward the middle of the year, and iall of the visits through out the years go back up reaching the end of the year. This may becuase visitors from UK try to get away from the winter in UK and travel to somewhere warm.  
+  Unusual Observation: New Zealand visit had a spike in 1988(approximately), and the fluctuation of UK visitors each year is increasing. Japanese visitor volumne is going down despite all other countries have increasing or constant visiting volumnes. My intuition is that people in Japan are aging more than growing, leading to a decrease in the number of people who are able to travel far.If we look at seasonality and subseries for Japan, the pattern is relatively the same. 
+  
+# 6
+```{r echo=TRUE, collapse=T}
+show(aus_retail)
+
+set.seed(7788993)
+myseries <- aus_retail %>%
+ filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+myseries %>% 
+  autoplot(Turnover)
+myseries %>%
+gg_season(Turnover)
+myseries %>%
+  gg_subseries(Turnover)
+myseries %>%
+  gg_lag(Turnover)
+myseries %>%
+  ACF(Turnover) %>%
+  autoplot()
+```
+Can you spot any seasonality, cyclicity and trend? What do you learn about the series?
+  Seasonality is observable in this sample, we can seee that in the turnover of Austrilian retail, there is an increase in turnover towards the end of the year, which could be caused by the holidays such as Thanksgiving and Christmas. 
+  There is also an overall upward sloping trend on the retail despite the seasonality each year. Thus far, there is observable trend and seasonality but no cyclicity observed yet. 
+  Based on the graphs, we can see that the retail in Autralia exhibits a clear pattern, it is always increasing, and the seasonality in retail is consistent with a spike at the end of each year. Before 1990, people tend to have a relatively flat shopping pattern, there is no obvious fluctuations year round. But after 1990s, we can see a bigger change in magnitude with the first autoplot, the gg_season graph also shows that. For the more recent years, we see this spike getting bigger and bigger as well as a bigger plummet on retail turnover in Febuary. A possible explanation for this, based on my intuition, is that has something to do with the evolution of money system and the culure of spending. People have certain cash or credit card at hand, and they tend to spend more in the holidays due to strong marketing campaigns, leaving them to spend less in the beginning of next year. On a broder scope, this also is due to the global economy development. 
+
+# 7
+- Total Private Employment in the US
+```{r echo=TRUE, collapse=T}
+#show(us_employment)
+
+TotalPrivate <- us_employment %>%
+  filter(Title=="Total Private") 
+show(TotalPrivate)
+
+TotalPrivate %>%
+  autoplot(Employed) +
+  ggtitle("Total Private Employment in the US")
+TotalPrivate %>%
+  gg_season(Employed) +
+  ggtitle("Total Private Employment in the US")
+TotalPrivate %>%
+  gg_subseries(Employed) +
+  ggtitle("Total Private Employment in the US")
+TotalPrivate %>%
+  gg_lag(Employed) +
+  ggtitle("Total Private Employment in the US")
+TotalPrivate %>%
+  ACF(Employed) %>%
+  autoplot() +
+  ggtitle("Total Private Employment in the US")
+```
+  Seasonality: relatively flat, however, the employment number tend to increase toward the end of the year slightly.
+  Trend: there is an upward sloping trend. The number employed is increasing across the time span. This is correlated with the increasing economic growth.
+  Cyclicity: there is no obvious cyclicity observed
+  There are several places where number of employed drop down, and the number drop is also related to the economic downturn. For example, there is a drop in number of employed in private sector right around the Great Recession in 2008, and after the Great Recession, the private emplyment number has been increasing steadily. 
+  
+- Bricks from Austrilian Production
+```{r echo=TRUE, collapse=T}
+#show(aus_production)
+
+aus_production %>%
+  autoplot(Bricks) +
+  ggtitle("Total Bricks Production in Austrilia")
+aus_production %>%
+  gg_season(Bricks) +
+  ggtitle("Bricks Production Seasonality in Austrilia")
+aus_production %>%
+  gg_subseries(Bricks) +
+  ggtitle("Bricks Production in Austrilia by Subseries")
+aus_production %>%
+  gg_lag(Bricks) +
+  ggtitle("Lags of Bricks Production in Austrilia")
+aus_production %>%
+  ACF(Bricks) %>%
+  autoplot() +
+  ggtitle("ACF of Bricks Production in Austrilia")
+```
+  Seasonality: the bricks production tend to increase and reach its peak during the middle of the year, then drops down towards the end of each year. Some year, the peak land on Apr, some years the peaks land on July. 
+  Trend: we observe the upward trend goes up till around 1980 then the peak for bricks production is over and it starts to drop. Possible explanation could be there is new resources in the market that customer favor.  
+  Cyclicity: if we have longer time span, we might be able to catch a cyclicity in the total bricks production
+  Unusual years: there is a significant drop in total number of bricks production around 1975, 1983 and three other less severe drop in 1991, 1996, and 2001(approximately). Although I dont have the background knowledge about the drops in total bricks production, possible explanations could be economic downturn, union strick. 
+
+- Hare Trading Records
+```{r echo=TRUE, collapse=T}
+show(pelt)
+
+pelt %>%
+  autoplot(Hare)
+#pelt %>%
+  #gg_season(Hare) ###seasonality unable to graph due to only annual data available.
+#pelt %>%
+  #gg_subseries(Hare)  ###subseries unable to graph due to only annual data available
+pelt %>%
+  gg_lag(Hare)
+pelt %>%
+  ACF(Hare) %>%
+  autoplot()
+```
+  Seasonality: 
+  
+
+- H02 from PBS
+```{r echo=TRUE, collapse=T}
+H02 <- PBS %>%
+  filter(ATC2=="H02")
+show(H02)
+H02 %>%
+  autoplot(Cost)
+H02 %>%
+ gg_season(Cost)
+H02 %>%
+  gg_subseries(Cost)
+H02 %>%
+  filter(Concession =="Concessional") %>%
+  #gg_lag(Cost) ###Error: The data provided to contains more than one time series. Please filter a single time series to use `gg_lag()`
+  show()
+H02 %>%
+  ACF(Cost) %>%
+  autoplot()
+```
+  Seasonality: depends on the differeny concession and type combinations, there are different seasonality shown in the plot. For concessional co-payments, the seasonality starts with a low cost, then the cost goes up during Febuary, March and remain high until September, then the cost of H02 goes down. Both Safety Net Concessional and General exhibit similar pattern. The cost is high in January, which is the starting time of the policy, then as the deadline approaches, the cost of H02 goes down. This seasonality is due to regulation on the type of drug H02. General Co-payments does not exhibit seasonality. 
+  Trend: both General Copayments and General Saety-net do not exhibit trend. However, there is an upward sloping trend in Concessional Co-payments cost. 
+  Cyclicity: none observed. 
+  Unusual Years: none observed. 
+
+- US Gasoline
+```{r echo=TRUE, collapse=T}
+show(us_gasoline)
+
+autoplot(us_gasoline)
+gg_season(us_gasoline)
+gg_subseries(us_gasoline)
+gg_lag(us_gasoline)
+us_gasoline %>%
+  ACF(Barrels) %>%
+  autoplot()
+```
+  Seasonality: there is an increase in the barrels of gasoline consumed towards May, and peak around July, August, then the number of barrels goes down and reachs low in January.
+  Trend: the number of barrels exhibits a upward sloping trend up till 2008, then the trend disappeared due to the Great Recession, and has been fluctuating since then.
+  Cyclicity: none observed.
+  Unusual years: 2008 as metioned above.
+
+# 8
+ 1. B
+ 2. A
+ 3. D
+ 4. C
+ 
+# 9
+```{r echo=TRUE, collapse=T}
+aus_livestock
+
+pigs <- aus_livestock %>%
+  filter(Animal =="Pigs") 
+show(pigs)
+pigs %>%
+  mutate(Month = as.Date(pigs$Month, format= "%d/%m/%y"))%>%
+  filter(Month >= as.Date('1990-01-01') & Month <= as.Date('1995-12-01')) %>%
+  autoplot(Count)
+pigs %>%
+  filter(Month >= as.Date('1990-01-01') & Month <= as.Date('1995-12-01')) %>%
+ # group_by(State) %>%
+  ACF(Count) %>%
+  autoplot()
+```
+- Compared to the White Noise Figures in textbook, the autoplots of the Pigs Slaughtered from 1990 to 1995 are actually very similar. There is hardly any seasonality or trend we observe in the first autoplot, nor there is obvious autocorrelation in the second autoplot for ACF. The ACF autoplot shows there is a few of the states exhibit autocorrelation in the number of pigs slaughtered during this time period, but there is no pattern in the ACF across states. The majority of the ACF plot is showing no autocorrelation among the observations.

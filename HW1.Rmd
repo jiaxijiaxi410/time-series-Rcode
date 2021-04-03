@@ -1,0 +1,311 @@
+---
+title: 'ECON 825 HW1'
+author: "Jiaxi Wang"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, echo=F, include=F, collapse=T}
+rm(list=ls()) #rm(list of objects) removes all objects from memory
+library(car)
+library(forecast)
+library(zoo)
+library(stargazer)
+```
+
+
+# Reading and Viewing the data
+- Below we import the data into R 
+- We also look at the start and end values
+
+```{r, echo=T, include=T, collapse=T}
+# Assign the name "house" to your data, read it in csv format with headers
+
+house <- read.csv("CSUSHPISA.csv", na.strings="NA", header=T)
+
+# Attach and view the dataset in R
+
+attach(house)
+#View(house)
+head(house)
+tail(house)
+```
+
+
+# Plotting
+
+- The time series plot of the housing price index is plotted below
+- There is an upward trend since 1987 with a significant drop around the Great Recession, but continued to grow around 2012-2013 and is exhibiting upward trend till current.
+
+```{r, echo=T, include=T, collapse=T}
+
+# Assign a name to time series and tell R that the data is a time series 
+# Also, speficfy headers in the data and a vector of start dates
+
+house<-ts(CSUSHPISA,frequency=12, start=c(1987, 1))
+```
+
+- The reason I picked housing prices index as a time series project is because it reflects the housing prices trend, and I want to be able to predict the trend of housing prices in the future to determine whether the housing prices will always continue to perform an upward sloping trend, with predictable growth rate.
+
+# Plot sales data & Define train data
+```{r, echo=T,include=T, collapse=T}
+plot(house, col="gold", main="Housing Prices", ylab="Housing Price Index", lwd=4)
+
+house.a <- window(house,start=c(1987,1),end=c(2014,1))
+```
+
+# Linear model & Discuss the linear model stats
+```{r, echo=T, include=T, collapse=T}
+linear.mod=tslm(house.a~trend)
+
+print(summary(linear.mod))
+```
+
+- In this linear model, the trend is indicated to have a very significant impact on the housing prices index, with a positive slope of 0.3560.
+- We can also observe a high adjusted R-squared of 0.7834
+
+```{r, echo=T, include=T, collapse=T}
+# Obtain AIC and SIC
+AIC(linear.mod)
+
+BIC(linear.mod)
+
+# Obtain DW statistic
+dwt(linear.mod)
+```
+# Discuss the linear model DW test
+
+- The DW test indicates that this is indeed a time series trend with a positive value of DW stats,which means that the disturbances in the data are positively correlated. 
+```{r, echo=T, include=T, collapse=T}
+
+house.f <- forecast(linear.mod,h=4, level=95)
+
+house.pred=linear.mod$fit
+plot(house.f)
+lines(house.pred)
+lines(house)
+```
+# Discuss the linear model residuals
+```{r, echo=T, include=T, collapse=T}
+
+#check on the residuals of the model
+
+house.resid <- linear.mod$residuals
+plot(house.resid)
+
+```
+
+- The graph of the residuals indicates that the linear model does not fit the data well becuase the plot of the residual shows that it is not exhibitng a linear trend. Therefore, we need to find alternative model to fit the data better.
+
+# Quadratic model & Discuss the quadratic model stats
+```{r,echo=T, include=T, collapse=T}
+# Quadratic model
+quadratic.mod=tslm(house.a~trend+I(trend*trend))
+
+print(summary(quadratic.mod))
+```
+
+- The quadratic model shows that this is a time series data, and the trend has strong significance on the data. However, the quadratic term of trend does not have any significance at all (p-value =0.0708). Dispite the non-significance of trend-squared, the whole model still exhibits high adjusted R-squared.
+# Discuss the DW of quadratic model
+```{r, echo=T, include=T, collapse=T}
+# Obtain AIC and SIC
+AIC(quadratic.mod)
+
+BIC(quadratic.mod)
+
+# Obtain DW stats
+dwt(quadratic.mod)
+```
+
+- The DW indicates that this data is indeed a time series. The 0.998 autocorrelation means that the disturbance at time T is strongly correlated with the disturbance at time T-1, and the positive DW stats reinforces this conclusion.
+
+# Forecasr on quadratic model
+```{r, echo=T, include=T, collapse=T}
+house.f2 <- forecast(quadratic.mod, h=4, level=95)
+
+house.pred2=quadratic.mod$fit
+plot(house.f2)
+lines(house.pred2)
+lines(house)
+```
+```{r, echo=T, include=T, collapse=T}
+house.red2<-quadratic.mod$residuals
+plot(house.red2)
+```
+# Discuss the residuals of the quadratic model
+
+- The residuals in quadratic model still exhibits non-linear trend.
+
+# Exponential Model & Discuss the exponential model stats
+```{r, echo=T, include=T, collapse=T}
+loghouse<-log(house)
+loghouse.a=window(loghouse, start=c(1987,1),end=c(2014,1))
+
+exp.mod=tslm(loghouse.a~trend)
+print(summary(exp.mod))
+```
+
+- Trend is stil very strongly significant in the model, the adjusted R-squared is higher compared to previous two models.
+# Forecast on exponential model
+
+```{r, echo=T, include=T, collapse=T}
+house.f3<-forecast(exp.mod,h=7,level=95)
+house.pred3=exp.mod$fit
+
+plot(house.f3)
+lines(house.pred3)
+lines(loghouse)
+```
+# Plot the residuals in exponential model
+```{r, echo=T, include=T, collapse=T}
+
+house.resid3<-exp.mod$residuals
+plot(house.resid3)
+```
+- The residual plot is not very different from the two residual plots above in terms of the shape. However, becuase this one is log function, the values on the y-axis is very different. 
+# Discuss the quadratic model DW stats
+
+```{r, echo=T, include=T, collapse=T}
+# Obtain AIC and SIC
+AIC(exp.mod)
+
+BIC(exp.mod)
+```
+- After comparing the three models on their AIC and SIC, we can see that the first two models have very similar AIC and SIC results, whereas the exponential model has drastically different values for both AIC and SIC. Because SIC has a harder panelty on the model so we use SIC to choose which model fits more.
+
+- As a result we choose expoential model because it has much smaller value compare to the linear and quadratic models in AIC and SIC.
+
+# Forecast the next 12 months of trend
+```{r, echo=T, include=T, collapse=T}
+house.f4<-forecast(exp.mod,h=12,level=95)
+house.pred4=exp.mod$fit
+
+plot(house.f4)
+lines(house.pred4)
+lines(loghouse)
+```
+```{r, echo=T,include=T,collapse=T}
+house.resid4<-exp.mod$residuals
+plot(house.resid4)
+```
+
+# Seasonability Problem
+
+- Graph all housing starts from 1959 to most recent
+```{r, echo=T, include=T, collapse=T}
+# remove all previous results and install relevant packages
+rm(list=ls())
+
+library(car)
+library(ggplot2)
+library(forecast)
+library(zoo)
+library(stargazer)
+
+
+hstart <- read.csv("HOUSTNSA.csv",header=TRUE)
+attach(hstart)
+head(hstart)
+tail(hstart)
+
+hstart <-ts(HOUSTNSA,frequency=12, start=c(1959, 1))
+
+plot(hstart,col="turquoise",lwd=2, main="Housing Starts",ylab="Number of Housing Starts")
+```
+# Graph housing starts from 2000m1 to 2006m1
+
+```{r, echo=T, include=T, collapse=T}
+hstart.a <- window(hstart, start=c(2000,1), end=c(2006,1))
+
+plot(hstart.a,col="pink",lwd=2, main="Housing Starts",ylab="Number of Housing Starts")
+```
+- Trends? Seasonality or cyclicity?
+
+- Dispite the general upward trend of the graph, thers is a peak of units of houses started in the beginning of each year from 2000 to 2006. The number of housing starts during the year fluctuates but the numbers drop significantly at the end of each year. 
+
+- As a result, we see there is a seasonality in the graph. 
+
+# Seasonality Modeling
+```{r, echo=T, include=T, collapse=T}
+hstart.b <- window(hstart, start=c(1959,1), end=c(2004,12))
+
+linear.mod=tslm(hstart.b~season)
+
+print(summary(linear.mod))
+
+ggseasonplot(hstart.b,year.labels=T, year.labels.left=T) + ylab("1000 units") +ggtitle("Housing Starts")
+```
+- The adjusted R-squared indicates that there is very little data can be explained by the model (Adj R-squared = 0.0011). However, the ggplot shows that there is a strong seasonality in the data, the units of housing started always increase during the year and always geos down around the end of the year. 
+
+# Obtain Diagnostic Stats
+```{r, echo=T, include=T, collapse=T}
+
+AIC(linear.mod)
+
+BIC(linear.mod)
+
+dwt(linear.mod)
+```
+- The AIC and SIC are similar to each other, and because SIC has a harsher penalty on the data, we use SIC for reference instead of AIC. Then the high autocorrelation shows that this is indeed a time series data, and the positive D-W stats indicates that the disturbance at time T is correlated with the disturbance at time T-1.
+
+# Report the actual, fitted, and residual graph
+
+```{r, echo=T, include=T, collapse=T}
+hstart.fit = linear.mod$fit
+hstart.resid=linear.mod$residuals
+
+plot(hstart.b, col="darkolivegreen",main="Housing Starts",ylab="Number of Housing Starts",lwd=2)
+lines(hstart.fit, col="chocolate")
+lines(hstart.resid)
+```
+# Forecast and Graph
+```{r, echo=T, include=T, collapse=T}
+
+hstart.f <- forecast(linear.mod,h=12,level=95)
+
+hstart.pred=linear.mod$fit 
+plot(hstart.f, col="blue",lwd=2)
+lines(hstart.pred)
+lines(hstart,col="darkred")
+```
+# Analyze the residuals
+
+```{r, echo=T, include=T, collapse=T}
+hstart.resid <- linear.mod$residuals
+plot(hstart.resid)
+```
+# Forecast for 1994
+```{r,echo=T, include=T, collapse=T}
+# set train window
+
+hstart.t <- window(hstart, start=c(1959,1),end=c(1993,12))
+lin.mod=tslm(hstart.t~season)
+print(summary(lin.mod))
+```
+- There is a strong seasonality of housing start units each year from 1959 to 1993. The adjusted R-squared is only 0.3614, meaning that only 36.14% of the data can be explained by the model.
+
+# Actual, fitted and residual graph
+```{r,echo=T, inclde=T, collapse=T}
+hstart.resid2=lin.mod$residuals
+hstart.fit2=lin.mod$fit
+
+plot(hstart.t, col="red")
+lines(hstart.resid2)
+lines(hstart.fit2)
+```
+# Forecast
+```{r, echo=T,include=T, collapse=T}
+hstart.f2<-forecast(lin.mod, h=12, level=95)
+hstart.1994<-window(hstart,start=c(1994,1),end=c(1994,12))
+plot(hstart.f2)
+lines(hstart.1994)
+```
+- The forecast of 1994 is almost perfectly laid on the acutal housing start units in 1994. This indicates the model used for this data is well fitted.
+# residuals of 1994 model
+```{r, echo=T, include=T, collapse=T}
+hstart.rsd2 <- lin.mod$residuals
+plot(hstart.rsd2)
+```

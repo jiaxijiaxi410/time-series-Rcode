@@ -1,0 +1,121 @@
+---
+title: "HW Forecaster Toolbox"
+author: "JIAXI WANG"
+date: "11/19/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=TRUE, collapse=T}
+rm(list=ls()) #rm(list of objects) removes all objects from memory
+#install.packages('fpp2')
+library(tsibble)
+library(tidyverse)
+library(tsibbledata)
+library(fable)
+library(fpp3)
+library(forecast)
+#library(ggfortify)
+library(fabletools)
+
+```
+# 10
+```{r echo=TRUE, collapse=T}
+# aus_retail is a monthly tsibble with one value - Turnover:	Retail turnover in $Million AUD
+aus_take <- aus_retail %>%  
+  filter(`Industry` =='Takeaway food services') %>%
+  filter(`State`=='Australian Capital Territory')
+
+show(aus_take)
+# Set training data from 1992 to 2014
+train <- aus_take %>% 
+  filter_index('1982 Apr'~'2014 Dec')
+
+show(train)
+# Fit the models
+fit <- train %>%
+  model(
+    Mean = MEAN(Turnover),
+    `Naïve` = NAIVE(Turnover),
+    `Seasonal naïve` = SNAIVE(Turnover),
+    `Drift` = RW(Turnover ~ drift())
+  )
+# Generate forecasts for 48 months or 4 years
+aus_forecast <- fit %>% forecast(h =48)
+# Plot forecasts against actual values
+aus_forecast %>%
+  autoplot(aus_take, level = NULL) +
+  ggtitle("Forecasts for Monthly Australian Takeout Turnover(Australian Capital Territory)") +
+  xlab("Year") + ylab("$Million AUD") +
+  guides(colour = guide_legend(title = "Forecast"))
+# Check the accuracy of the predictions
+accuracy(aus_forecast,aus_take)
+# The residuals from the best method
+best_fit <- train %>%
+  model(`Drift` = RW(Turnover ~ drift()))
+aus_seasonal <- best_fit %>% forecast(h=48)
+augment(best_fit) %>% gg_tsdisplay(.resid, plot_type = "hist")
+```
+Based on above results, Drift model is performing best among the four models, altough the residual does  resemble white noise. The mean is close to zero, with the residuals behave normal distribution. However, we see there is significant number, more than half, of the lags that means there are some correlations among the residuals. Thus, there is information contained in the residuals that we did not capture with the Drift model. 
+```{r echo=TRUE, collapse=T}
+aus_takeout <- aus_retail %>%
+  filter(`Industry` =='Takeaway food services') %>%
+  filter(`State`=='Queensland')
+show(aus_take)
+# Set training data from 1992 to 2014
+train <- aus_takeout %>% 
+  filter_index('1982 Apr'~'2014 Dec') 
+show(train)
+# Fit the models
+fit <- train %>%
+  model(
+    Mean = MEAN(Turnover),
+    `Naïve` = NAIVE(Turnover),
+    `Seasonal naïve` = SNAIVE(Turnover),
+    `Drift` = RW(Turnover ~ drift())
+  )
+# Generate forecasts for 48 months or 4 years
+aus_forecast2 <- fit %>% forecast(h =48)
+# Plot forecasts against actual values
+aus_forecast2 %>%
+  autoplot(aus_takeout, level = NULL) +
+  ggtitle("Forecasts for Monthly Australian Takeout Turnover(Queensland)") +
+  xlab("Year") + ylab("$Million AUD") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+accuracy(aus_forecast2,aus_takeout)
+
+best_fit <- train %>%
+  model(`Seasonal naïve` = SNAIVE(Turnover))
+        
+aus_seasonal <- best_fit %>% forecast(h=48)
+
+augment(best_fit) %>% gg_tsdisplay(.resid, plot_type = "hist")
+
+```
+Based on the accruacy result, we can see that Seasonal Naive is performing better with smallest RMSE, MAE  etc. So we take SNAIVE model further to check on the residuals. Similar conclusion can be drawn here, the SNAIVE model is having variance close to zero, and the residuals are exhibiting normal distribution, yet the tail is long to the right, indicating that the residuals are not behaving like white noise. On top of that, the ACF plot shows that there is a decaying correlation among the residuals. Therefore, this model is not best predicting the forecast.
+
+Below is another model try on Northern Territory with SNAIVE model that yield the same result as above. 
+```{r echo=TRUE, collapse=T}
+aus_take2 <- aus_retail %>%
+  filter(`Industry` =='Takeaway food services') %>%
+  filter(`State`=='Northern Territory')
+show(aus_take2)
+# Set training data from 1992 to 2014
+train <- aus_take2 %>% 
+  filter_index('1982 Apr'~'2014 Dec') 
+show(train)
+test <- aus_take2 %>% 
+  filter_index('2015 Jan'~.) 
+show(test)
+# Fit the models
+fit2 <- train %>%
+  model(`Seasonal naïve` = SNAIVE(Turnover))
+aus_seasonal2 <- fit2 %>% forecast(h=48)
+
+augment(fit2) %>% gg_tsdisplay(.resid, plot_type = "hist")
+```
+

@@ -1,0 +1,158 @@
+---
+title: "ECON 825 HW3"
+author: "JIAXI WANG"
+date: "5/2/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=TRUE, collapse=T}
+rm(list=ls()) #rm(list of objects) removes all objects from memory
+library(tsibble)
+library(tidyverse)
+library(tsibbledata)
+library(fable)
+library(fpp3)
+library(forecast)
+library(ggfortify)
+library(fabletools)
+```
+Chapter 8 
+
+Problems: 5,6, 15
+
+Optional: 12, 14
+
+#5
+
+a. Plot and discuss main features of the data
+```{r echo=TRUE, collapse=T}
+#install.packages("fma")
+library(fma)
+
+books <- fma::books %>% as_tsibble()
+books %>% autoplot(value)
+show(books)
+```
+This is a dataset that contains bivariate time series of the sales of two types of books, paperback and hardcover. The sales are recorded on a daily basis for 30 days. The plot above shows that there is not much of a seasonality pattern, although we can observe that there is a trough once approximately 7 days. This is possible if the store is closed on that day of the week or people do not shop on that day in general. In terms of trend, both Paperback and Hardcover book sales are exhibiting upward trend despite the fluctuations overtime.
+
+b-c
+```{r echo=TRUE, collapse=T}
+books %>%
+ model(SES=ETS(value ~ error ("A") + trend ("N") + season("N"))) %>%
+  forecast(h = 4) %>%
+  autoplot(books) 
+
+books %>%
+  model(SES=ETS(value ~ error ("A") + trend ("N") + season("N"))) %>%
+  accuracy()
+```
+b. 
+  Using SES model(ANN) to forecast each time series at h=4 we can see that both forecasts are flat, with 80 and 95 prediction intervals. The SES helps to forecasting data that have no clear trend or pattern. Therefore the forecast for the sales of Hardcover and Paperback books in the next four days are flat. The prediction intervals is covering a wide range of potential changes, in other words, there is still a lot of uncertainty in the forecast. 
+
+c.
+  The RMSE value is 33.64 for Paperback but 31.93 for Hardcover books. Overall, RMSE is indicating that SES model(ANN) is performing similar to both series. 
+
+#6
+6.a-c
+```{r echo=TRUE, collapse=T}
+#6.a code for AAN, Holt's Linear method forecast
+books %>%
+  model(Holts=ETS(value ~ error ("A") + trend ("A") + season("N"))) %>%
+  forecast(h=4) %>%
+  autoplot(books) 
+
+#6.b compare RMSE for Holt's method
+books %>%
+  model(Holts=ETS(value ~ error ("A") + trend ("A") + season("N"))) %>%
+  accuracy()
+```
+Here we can see that the RMSE is slightly smaller than the SES model RMSE. Only changing one parameter, from no trend to include addictive trend in the model, the RMSE drops. Rather than a flat prediction in the SES model, with Holt's Linear method, the forecast is displaying an upward trend. But the forecast is still linear because AAN only incorporate the estimated trend value using the last sales number with an estimated trend value each day in the next four days. 
+
+6.c
+```{r echo=TRUE, collapse=T}
+books %>%
+  model(
+    SES=ETS(value ~ error ("A") + trend ("N") + season("N")),
+    Holts=ETS(value ~ error("A") + trend("A") + season("N"))) %>%
+  accuracy()
+```
+6.c Compare the forecast for two series using both SES and Holt's Linear method, we can see that Holt's Linear method helpes to estimate the sales of both types of books better than SES model. The RMSE values are smaller in both series using Holt's linear method. This is because Holt's Linear is able to capture the upward trend in the model.Therefore, Holt's Linear mothod is better. 
+
+6.d
+```{r echo=TRUE, collapse=T}
+#obtain forecast value of h=1
+
+library(fable)
+h1 <- books %>%
+  model(Holts=ETS(value ~ error ("A") + trend ("A") + season("N"))) %>%
+  forecast(h=1) %>%
+  hilo(level=95)
+show(h1)
+#calculating prediction interval with RMSE and assuming normal errors
+hc1 <-250.1720
+pb1 <-209.4602
+
+hcrmse <- 27.19358
+pbrmse <- 31.13692
+
+hcupper <- hc1 + 1.96*hcrmse
+hclower <- hc1 - 1.96*hcrmse
+
+pbupper <- pb1 + 1.96*pbrmse
+pblower <- pb1 - 1.96*pbrmse
+
+Hardcover <- c(hclower, hcupper)
+Hardcover
+Paperback <- c(pblower, pbupper)
+Paperback
+
+
+```
+The estimated value for the first forecast in the Holt's model is manually calculated as between 196.8726 and 303.4714 for Hardcover sales, and between 148.4318 and 270.4886 for Paperback sales. The forecast interval is not shown using "hilo" command therefore it is hard to compare. However, I believe that once the prediction interval is presenting the numbers, the range would be approximately the same. Moreover, the difference between the hi-value and the low-value also reveals that smaller RMSE is lead to smaller variation in the forecast. 
+
+#15
+
+```{r echo=TRUE, collapse=T}
+#Australia Tourism
+aus_trips <- tourism %>%
+  summarise (Trips = sum (Trips))
+
+aus_trips %>%
+  model (ETS (Trips)) %>%
+  forecast () %>%
+  autoplot (aus_trips)
+
+#GAFA stock
+gafa_regular <- gafa_stock %>%
+  group_by (Symbol) %>%
+  mutate (trading_day = row_number ()) %>%
+  ungroup () %>%
+  as_tsibble (index =  trading_day, regular = TRUE )
+
+gafa_stock %>% 
+  autoplot (Close)
+
+gafa_regular %>%
+  model (ETS (Close)) %>%
+  forecast (h = 50) %>%
+  autoplot (gafa_regular %>% 
+              group_by_key () %>% 
+              slice ((n () - 100 ):n ()))
+
+#Lynx in pelt
+pelt<- pelt %>% as_tsibble() 
+
+pelt %>% autoplot(Lynx)
+
+pelt %>% 
+  model(ETS(Lynx)) %>%
+  forecast(h=20) %>%
+  autoplot(pelt) 
+```
+a. The ETS command is applied to all three sets of data to forecast. Among the three, the ETS is performing best on Australia trips, with simulated trends and seasonality. The forecast on GAFA stock is not as fit as compared to aus_trips. The forecast for gafa_stock is a flat line, with prediction interval increases as days proceed. As for Lynx in the pelt data, the forecast is widely spreaded, covering the maximum value in the past as well as the minimum value in the past, and go over the two extremes even. This is not a well suited forecast due to the wide prediction intervals. Also, the forecast is a flat line, therefore no trend or seasonality is predicted in the forecast.
+
+b. The reason that Lynx in pelt dataset is not forecasting well using ETS is probably because there is no observed trend over the years. On top of the no trend reason, the seasonality is also hard to capture since the data is dated way back using only annual records. Perhaps the two reasons lead to bad forecast in this dataset. 

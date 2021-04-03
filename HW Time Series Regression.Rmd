@@ -1,0 +1,85 @@
+---
+title: "HW Time Series Regression"
+author: "JIAXI WANG"
+date: "11/19/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=TRUE, collapse=T}
+rm(list=ls()) #rm(list of objects) removes all objects from memory
+#install.packages('fpp2')
+library(tsibble)
+library(dplyr)
+library(tidyverse)
+library(tsibbledata)
+library(fable)
+library(fpp3)
+library(forecast)
+#library(ggfortify)
+library(fabletools)
+```
+
+Hyndman Chapter 7 exercises: Question 1 is must do and question 2 is optional.
+```{r echo=TRUE, collapse=T}
+# Extract the January 2014 electricity demand, and aggregate this data to daily with daily total demands and maximum temperatures
+jan14_vic_elec <- vic_elec %>%
+  filter(yearmonth(Time) == yearmonth("2014 Jan")) %>%
+  index_by(Date = as_date(Time)) %>%
+  summarise(Demand = sum(Demand), Temperature = max(Temperature))
+# Plot the data and find the regression model for Demand with temperature as an explanatory variable. 
+jan14_vic_elec %>% 
+  as.data.frame() %>%
+  ggplot(aes(x=Temperature, y=Demand)) + 
+  ggtitle("Electricity Demand for Victoria, Australia (2014 Jan)") +
+  ylab("Demand") + 
+  xlab("Temperature (Celsius)") + 
+  geom_point() + 
+  geom_smooth(method="lm", se=FALSE)
+# Use the model to forecast 
+fit_jan <- jan14_vic_elec %>%
+  model(lm = TSLM(Demand ~ Temperature))
+report(fit_jan)
+# Produce a residual plot
+fit_jan %>% gg_tsresiduals()
+# Forecast the electricity demand for the next day with max temp=15C
+jan14_vic_elec %>%
+  model(TSLM(Demand ~ Temperature)) %>%
+  forecast(
+    new_data(jan14_vic_elec, 1) %>% mutate(Temperature = 15)
+  ) %>%
+  autoplot(jan14_vic_elec)
+# Forecast the electricity demand for the next day with max temp=35C
+jan14_vic_elec %>%
+  model(TSLM(Demand ~ Temperature)) %>%
+  forecast(
+    new_data(jan14_vic_elec, 1) %>% 
+      mutate(Temperature = 35)
+    ) %>%
+  autoplot(jan14_vic_elec) 
+# Prediction intervals for the forecasts
+datav = jan14_vic_elec
+newdt <- data.frame(Temperature = c(15, 35))
+model <- lm(Demand ~ Temperature, data=datav)
+vic_interval <- data.frame(predict(model, newdt,interval = "prediction", level = 0.95))
+show(vic_interval)
+# Plot Demand vs Temperature for all of the available data in vic_elec
+vic_elec %>%
+  index_by(Date = as_date(Time)) %>%
+  summarise(Demand = sum(Demand), Temperature = max(Temperature)) %>%
+  ggplot(aes(x=Temperature, y=Demand)) + 
+  ggtitle("Electricity Demand for Victoria, Australia") +
+  ylab("Demand") + 
+  xlab("Temperature (Celsius)") + 
+  geom_point() 
+```
+Using linear model, we can see that there is upward relationship between temperature and electitricity demand. As temperature rises, the demand for electricity also goes up. Looking at the reisduals plots, the residuals do not exhibit significant correlations among its lags. However, the residuals is skewed left as oppposed the behaving normal distribution. The left tail also has a hump instead of diminishing tail. Since we cannot have a constant variance with zero means and the distribution of the reiduals are not normally distributed, we need to rely on prediction intervals to justify our forecast. Predicting the temperature for the next day if the maximum temperature was 15C and compare it with the forecast if the with maximum temperature was 35C. Just eyeballing the forecast for both 15 and 35, the 15 degree forecast is not very promising, but the 35 degree forecast is not far from the existing temperature. 
+The 95% prediction intervals for forecasts on the next day with maximum temperature is 15 is between [98364.97,	204904.0].
+The 95% prediction intervals for forecasts on the next day with maximum temperature is 35 is between [223111.63,	326219.3].
+The plot of the electricity demand for Victoria over the entire time period reveals that linear model may not be appropriate. The demand for electricity goes up when the temperature is either too low or too high, therefore the best form to fit this data should be quadratic.
+```{r echo=TRUE, collapse=T}
+
+```

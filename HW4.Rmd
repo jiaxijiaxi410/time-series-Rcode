@@ -1,0 +1,211 @@
+---
+title: "HW4"
+author: "JIAXI WANG"
+date: "11/9/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=TRUE, collapse=T}
+rm(list=ls()) #rm(list of objects) removes all objects from memory
+#install.packages('fpp2')
+library(tsibble)
+library(tidyverse)
+library(tsibbledata)
+library(fable)
+library(fpp2)
+library(forecast)
+#library(ggfortify)
+library(fabletools)
+
+```
+
+Homework 4 ARIMA 
+- Hyndman Chapter 9: 2,3,6,9
+
+#2. Plot the daily closing prices for IBM stock and the ACF and PACF. Explain how each plot shows that the series is non-stationary and should be differenced.
+
+```{r echo=TRUE, collapse = T}
+library(fma)
+
+IBMc <- fma::ibmclose 
+ggtsdisplay(IBMc)
+# "Plots a time series along with its acf and either its pacf, lagged scatterplot or spectrum."
+```
+
+Explain how each plot shows that the series is non-stationary and should be differenced:
+
+Stationary data means that no trend or seasonality observed over time. Looking at the stock close grah, the IBM's stock close price is non-stationary because we can observe the trend, or possible seasonality across time. We can also see from the ACF plot that this time series ACF decreases very slowly, which  means that it is a non-stationary time series. The PACF is partial autocorrelation, which removes the effects of lags and exhibits the relationship between y_t and y_(t-k). The PACF plot shows that the first lag similar to ACF plot,(large and positive) but drops significantly indicates that the time series is non-stationary. In order to make IBM's stock close price stationary and apply ARIMA model, we can transform the time series to eliminate the trend and seasonality by differencing. 
+
+# 3 For the following series, find an appropriate Box-Cox transformation and order of differencing in order to obtain stationary data.
+
+expsmooth::usnetelec
+United states GDP from global_economy
+expsmooth::mcopper
+expsmooth::enplanements
+expsmooth::visitors
+``` {r echo=TRUE, collaspse = T}
+library(expsmooth) 
+#Description: Annual US net electricity generation (billion kwh) for 1949-2003
+ggtsdisplay(usnetelec)
+
+lambda = BoxCox.lambda(usnetelec)
+usnetelec_box_cox = BoxCox(usnetelec,lambda)
+autoplot(usnetelec_box_cox)
+
+ggtsdisplay(diff(usnetelec))
+```
+Looking at the first plot of the US annual electricity generation, we can see there is an upward linear relationship and no seasonality is observed. Therefore, we apply the first order differencing using diff and get the second plot that shows that made the data stationary. 
+``` {r echo=TRUE, collaspse = T}
+ggtsdisplay(usgdp) #Quarterly US GDP. 1947:1 - 2006.1.
+
+lambda = BoxCox.lambda(usgdp)
+usgdp_box_cox = BoxCox(usgdp,lambda)
+autoplot(usgdp_box_cox)
+
+ggtsdisplay(diff(usnetelec))
+```
+By eyeballing the first plot, we can see that the data is non-stationary, therefore at least first order differencing is needed. We then apply Box-Cox transformation, but the data does not need Box-Cox transformation (looking at the second plot), nor adjust for seasonality, therefore we apply directly first order differencing on the data. After that, the ACF and PACF on the first order difference plot look like white noise, and the plot of first order differenced data appears to be stationary. 
+
+``` {r echo=TRUE, collaspse = T}
+ggtsdisplay(mcopper) #Monthly copper prices
+
+lambda = BoxCox.lambda(mcopper)
+mcopper_box_cox = BoxCox(mcopper,lambda)
+autoplot(mcopper_box_cox)
+
+ggtsdisplay(diff(mcopper))
+mcopper %>%  diff() %>% diff() %>% ggtsdisplay()
+```
+Eyeballing the plot, this time series does not appear to be stationary, and based on the first ACF and PACF plot, we can tell that the data needs at least first order differencing. After applying Box-Cox transformation, the data looks not very different from the original plot, it is still not stationary. Therefore we apply first order differencing and twice differencing side by side to compare. Here we can see that the first order differecing is better than second order differencing because the plots of ACF and PACF look more like white noise for first order differencing as opposed to twice differencing ACF and PACF plots.
+
+``` {r echo=TRUE, collaspse = T}
+ggtsdisplay(enplanements)  #Monthly US domestic enplanements
+
+lambda = BoxCox.lambda(enplanements)
+enplanements_box_cox = BoxCox(enplanements,lambda)
+ggtsdisplay(enplanements_box_cox)
+
+enplanements %>% 
+  BoxCox(lambda) %>% 
+  diff(lag=12) %>% 
+  diff() %>% 
+  ggtsdisplay()
+```
+The enplanements data does exhibit strong seasonality, and it is not stationary. Even after we applid Box-Cox, the time series still exhibits trend, and does not look to be stationary. Therefore, we first apply the seasonal differencing, then the first order differencing and the data now looks to be stationary. 
+
+``` {r echo=TRUE, collaspse = T}
+ggtsdisplay(visitors)  #Monthly Australian short-term overseas vistors. May 1985-April 2005
+ 
+lambda = BoxCox.lambda(visitors)
+visitors_box_cox = BoxCox(visitors,lambda)
+autoplot(visitors_box_cox)
+
+visitors %>% 
+  BoxCox(lambda) %>%
+  diff(lag =12) %>%
+  diff() %>%
+  ggtsdisplay()
+```
+# 6 Simulate and plot some data from simple ARIMA models
+``` {r echo=TRUE, collaspse = T}
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.6*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim)
+
+for(i in 2:100)
+  y[i] <- 0.2*y[i-1] + e[i]
+sim2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim2)
+
+for(i in 2:100)
+  y[i] <- 0.9*y[i-1] + e[i]
+sim3 <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim3)
+```
+The plot change from changing phi from 0.6 to 0.2 to 0.9. The plot looks sharper with lower phi (0.2) and smoother with higher phi (0.9). Because phi is the coefficient for y_(t-1) which means how much of y_(t-1) is related to y, therefore, hiher phi coefficient leads to smoother changes from previous time t-1 to current time t. 
+
+``` {r echo=TRUE, collaspse = T}
+for(i in 2:100)
+  y[i] <- 0.6*e[i-1] + e[i]
+sim4 <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim4)
+
+for(i in 2:100)
+  y[i] <- 0.2*e[i-1] + e[i]
+sim5 <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim5)
+
+for(i in 2:100)
+  y[i] <- 0.9*e[i-1] + e[i]
+sim6 <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim6)
+```
+MA(1) model: change the theta from 0.6 to 0.2 to 0.9, the plot did not change much in terms of the smootheness like AR(1), and the peaks and troughs are still positioned relatively at the same place.This is because MA(1) deals with how much residuals are counted into the next period. 
+
+#6-e,f,g: Generate data from an ARMA(1,1), generate data from an AR(2) model and compare the two series
+``` {r echo=TRUE, collaspse = T}
+for(i in 2:100)
+  y[i] <- 0.6*y[i-1]+0.6*e[i-1] + e[i]
+sim_arima <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim_arima)
+
+for(i in 3:100)
+  y[i] <- -0.8*y[i-1]+0.3*y[i-2] + e[i]
+sim_ar2 <- tsibble(idx = seq_len(100), y = y, index = idx)
+autoplot(sim_ar2)
+```
+The ARIMA(1,1) model exhibits more like a regular time series with random peaks and troughs, whereas in the AR(2) model, the coefficient for y_(t-2) is positive 0.3, which adds positive feedback into the model, as a result, y increases exponentially over time. 
+
+#9-a United States GDP series
+``` {r echo=TRUE, collaspse = T}
+ggtsdisplay(usgdp)
+usgdp %>% ndiffs
+usgdp %>% 
+  BoxCox(lambda) %>% 
+  diff() %>% 
+  diff() %>%
+  ggtsdisplay()
+```
+Based on the result from ndiff, the data needs twice differencing. After taking Box-Cox transformation and twice differencing, the data now seems to be stationary.
+
+#9-b,c,d. fit a suitable ARIMA model to the transformed data
+``` {r echo=TRUE, collaspse = T}
+library(lmtest)
+
+fitARIMA <- arima(usgdp, order=c(1,2,1),seasonal = list(order = c(1,0,0), period = 12),method="ML")
+coeftest(fitARIMA)
+
+fit2 <- arima(usgdp, order=c(1,1,1),seasonal = list(order = c(0,0,0), period = 12),method="ML")
+coeftest(fit2)
+
+usgdp %>% auto.arima()
+```
+The best ARIMA model that would fit this data is the ARIMA(2,2,2) with lowest AICc shown from the residual diagnostics. But ARIMA(1,2,1) and ARIMA(1,1,1) also shows to be significant.
+
+#9-e: other plausible ARIMA models and the best, then forecast.
+``` {r echo=TRUE, collaspse = T}
+predARIMA <- forecast(fitARIMA)
+autoplot(predARIMA)
+
+usgdp_auto <- usgdp %>% 
+  auto.arima() %>%
+  forecast()
+
+autoplot(usgdp_auto)
+```
+The first forecast is based on model ARIMA(1,2,1), and the second forecast is based on ARIMA(2,2,2), indeed, the forecast in the second one looks to be more reasonable.
+``` {r echo=TRUE, collaspse = T}
+usgdp_ets <- forecast(ets(usgdp)) 
+
+X <- cbind(usgdp_ets =usgdp_ets$mean, usgdp_auto=usgdp_auto$mean)
+df <- cbind(usgdp,X)
+autoplot(df)
+```
+The ETS forecast is slightly higher than ARIMA(2,2,2) model.
